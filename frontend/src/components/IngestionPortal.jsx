@@ -4,7 +4,7 @@ import { apiFetch } from '../lib/api';
 
 const IngestionPortal = () => {
   const [selectedFiles, setSelectedFiles] = useState([]);
-  const [isParallel, setIsParallel] = useState(true);
+  const [isParallel, setIsParallel] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [logs, setLogs] = useState([]);
   const [uploadResults, setUploadResults] = useState(null);
@@ -36,7 +36,21 @@ const IngestionPortal = () => {
   };
 
   const addFilesToQueue = (files) => {
-    const newFiles = files.filter(
+    const MAX_FILE_SIZE = 500 * 1024; // 500KB proxy for ~5 pages
+    const validFiles = [];
+
+    files.forEach((file) => {
+      if (file.size > MAX_FILE_SIZE) {
+        addLog(
+          `[LIMIT EXCEEDED] ${file.name} (${(file.size / 1024).toFixed(1)} KB) exceeds the ~5 page limitation set for this demo tier. Upload rejected.`,
+          'error'
+        );
+      } else {
+        validFiles.push(file);
+      }
+    });
+
+    const newFiles = validFiles.filter(
       (file) => !selectedFiles.some((f) => f.name === file.name)
     );
     if (newFiles.length === 0) return;
@@ -57,6 +71,7 @@ const IngestionPortal = () => {
     setUploadResults(null);
     setLogs([]);
     addLog(`Starting ingestion pipeline for ${selectedFiles.length} document(s)...`, 'info');
+    addLog('Advisory: Free-tier instance is memory-capped; documents close to ~5 pages recommended.', 'warning');
     addLog(`Ingestion mode: ${isParallel ? 'PARALLEL processing enabled' : 'SEQUENTIAL processing enabled'}`, 'info');
 
     const formData = new FormData();
@@ -117,6 +132,14 @@ const IngestionPortal = () => {
 
       <div className="portal-grid">
         <div className="portal-main-panel">
+          {/* Free Tier Limitation Banner */}
+          <div style={{ backgroundColor: '#fffbeb', borderLeft: '4px solid #f59e0b', padding: '14px 16px', marginBottom: '20px', borderRadius: '0 6px 6px 0' }}>
+            <h4 style={{ fontSize: '0.875rem', fontWeight: '700', color: '#92400e', margin: 0 }}>Free Tier Limitation Active</h4>
+            <p style={{ fontSize: '0.85rem', color: '#b45309', margin: '4px 0 0 0', lineHeight: 1.4 }}>
+              Please keep document uploads close to 5 pages for now. This demo runs on a memory-constrained free tier. Larger documents are supported by the architecture but require a Hugging Face or Cloud Run backend provider to process without crashing.
+            </p>
+          </div>
+
           {/* Drag and Drop Zone */}
           <div 
             className={`dropzone ${isUploading ? 'disabled' : ''}`}
@@ -175,7 +198,10 @@ const IngestionPortal = () => {
                     <Zap size={16} className="accent-color" />
                     <span>Parallel Processing Mode</span>
                   </div>
-                  <p>Splits PDFs and generates embeddings concurrently. Speed is up to 5x faster, but may exceed limits on free-tier API keys.</p>
+                  <p>Splits PDFs and generates embeddings concurrently. Speed is up to 5x faster.</p>
+                  <p style={{ color: '#dc2626', fontSize: '0.8rem', fontWeight: '500', marginTop: '4px' }}>
+                    ⚠️ Keep disabled on the free tier. If ingestion is failing or hanging, ensure this is turned off to prevent memory crashes.
+                  </p>
                 </div>
                 <label className="toggle-switch">
                   <input 
@@ -219,7 +245,7 @@ const IngestionPortal = () => {
           <div className="logs-container">
             {logs.length === 0 ? (
               <div className="empty-logs">
-                <p>Waiting for ingestion to start. Monitor chunking, embeddings, and vector DB uploads here.</p>
+                <p>Waiting for ingestion to start. Please keep documents close to 5 pages for this free-tier demo. Monitor chunking, embeddings, and vector DB uploads here.</p>
               </div>
             ) : (
               logs.map((log, idx) => (

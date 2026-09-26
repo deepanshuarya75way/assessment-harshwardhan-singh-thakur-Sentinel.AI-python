@@ -24,10 +24,16 @@ function App() {
           <div 
             className="logo-container" 
             onClick={() => setCurrentView('landing')}
-            style={{ cursor: 'pointer' }}
+            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
           >
             <ShieldCheck size={26} className="shield-icon" />
-            <h1>Sentinel.AI</h1>
+            <h1 style={{ margin: 0, whiteSpace: 'nowrap' }}>Sentinel.AI</h1>
+            <span 
+              className="bg-blue-100 text-blue-800 text-xxs font-semibold px-2.5 py-0.5 rounded border border-blue-200 shadow-sm"
+              style={{ whiteSpace: 'nowrap' }}
+            >
+              Powered by Python & LangChain
+            </span>
           </div>
           
           <button 

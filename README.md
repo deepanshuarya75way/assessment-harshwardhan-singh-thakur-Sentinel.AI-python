@@ -143,6 +143,9 @@ cleanly rather than crashing.
   ephemeral disk, so anything ingested via the Ingestion tab is wiped on
   every redeploy. Fine for a demo; a real deployment would use a persistent
   volume or a hosted vector DB.
+- **Live Demo Ingestion Limits (Cloud Tier Constraint):** The public demo backend runs on Render's free 512MB RAM instance. Because document embeddings are computed locally in-memory via `fastembed` (ONNX Runtime), live PDF ingestion is intentionally capped at a safe limit of **~5 pages per upload**. 
+- **Parallel Processing:** The frontend's "Parallel Processing" toggle must remain disabled on the live demo. Concurrent embedding generation causes instantaneous RAM spikes that exceed the 512MB limit, resulting in a server crash.
+- **Scalability:** These are strict hardware constraints of the free hosting tier, not the architecture. In a production environment with dedicated nodes or Google Cloud Run, the pipeline seamlessly processes full-length books and supports parallel ingestion.
 
 ---
 
