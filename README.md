@@ -1,4 +1,4 @@
-# Sentinel.AI — LangChain Edition
+# Sentinel.AI — LangChain Edition (Backend Only)
 
 A reimplementation of [Sentinel.AI](../Sentinel-AI) (the original Node.js/Express
 multi-agent RAG system) using **FastAPI + LangChain + Hugging Face**.
