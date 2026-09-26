@@ -16,10 +16,16 @@ langchain-community>=0.3.5
 langchain-openai>=0.2.6
 langchain-chroma>=0.1.4
 
-# Hugging Face
-sentence-transformers>=3.2.1
-transformers>=4.46.0
-langchain-huggingface>=0.1.2
+# Embeddings — fastembed (ONNX Runtime), not sentence-transformers.
+# Dropped sentence-transformers + transformers + langchain-huggingface here:
+# they pull in full PyTorch, which alone ate enough RAM to OOM-crash on
+# Render's free 512MB tier the moment a real query loaded the model. Also
+# moot now that HF Spaces' free Docker tier got paywalled in July 2026 — no
+# reason to keep Hugging Face's heavier stack around either way.
+# fastembed runs the same model (all-MiniLM-L6-v2) via ONNX Runtime instead,
+# 5-10x lighter, and langchain-community already has a FastEmbedEmbeddings
+# wrapper for it, so no other LangChain packages needed changing.
+fastembed>=0.4.2
 
 # Rate limiting
 slowapi>=0.1.9

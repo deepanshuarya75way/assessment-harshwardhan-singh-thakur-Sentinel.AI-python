@@ -15,6 +15,7 @@ from slowapi.util import get_remote_address
 
 from app.config import settings
 from app.routers import auth, documents, query
+from app.services.vectorstore import get_vectorstore
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
 logger = logging.getLogger("sentinel.main")
@@ -69,3 +70,15 @@ async def startup_event():
     logger.info(f"  Health check  : GET  http://localhost:{settings.PORT}/api/v1/health")
     logger.info(f"  Allowed origins: {settings.allowed_origins}")
     logger.info("-" * 55)
+
+    # Load the embedding model + Chroma store right now, at boot, instead
+    # of lazily on the first /query request. It was lazy before, which is
+    # exactly why the Render OOM crash was so confusing to debug — the
+    # health check passed fine (no model loaded yet), then the container
+    # got silently OOM-killed mid-request the first time a real question
+    # came in, with no error logged anywhere. Loading it here means: if
+    # this is going to run out of memory, it fails loudly in the deploy
+    # logs right now, not silently on some user's first message later.
+    logger.info("Loading embedding model + vector store...")
+    get_vectorstore()
+    logger.info("Embedding model + vector store ready.")

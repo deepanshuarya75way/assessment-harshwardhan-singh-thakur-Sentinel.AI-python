@@ -34,8 +34,17 @@ class Settings(BaseSettings):
     GENERATOR_AGENT_MODEL: str = "anthropic/claude-3-haiku"
     EVALUATOR_AGENT_MODEL: str = "google/gemini-2.0-flash-001"
 
-    # ── Hugging Face Embeddings ──────────────────────────────
+    # ── Embeddings ────────────────────────────────────────────
+    # Model name is unchanged from the sentence-transformers days — same
+    # model, fastembed just loads it through ONNX Runtime instead of
+    # PyTorch (see app/services/embeddings.py for why I switched).
     HF_EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
+    # Where fastembed caches the downloaded ONNX model on disk between
+    # restarts. Render's free tier disk is ephemeral (wiped on redeploy),
+    # so this doesn't survive a redeploy either way — it just avoids a
+    # redundant re-download if the container merely restarts (e.g. after
+    # a crash) without a fresh deploy.
+    FASTEMBED_CACHE_DIR: str = "./fastembed_cache"
 
     # ── Vector Store ─────────────────────────────────────────
     VECTOR_STORE: str = "chroma"  # "chroma" | "pinecone"
