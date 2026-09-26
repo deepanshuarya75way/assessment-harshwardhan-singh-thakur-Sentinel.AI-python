@@ -14,7 +14,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from app.config import settings
-from app.routers import auth, query
+from app.routers import auth, documents, query
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
 logger = logging.getLogger("sentinel.main")
@@ -33,7 +33,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_URL],
+    allow_origins=settings.allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
@@ -41,6 +41,7 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(query.router)
+app.include_router(documents.router)
 
 
 @app.get("/")
@@ -49,7 +50,8 @@ async def root():
         "service": "Sentinel.AI Backend (LangChain Edition)",
         "version": "1.0.0",
         "status": "running",
-        "docsHint": "GET /docs for interactive API docs | POST /api/v1/auth/token | POST /api/v1/query",
+        "docsHint": "GET /docs for interactive API docs | POST /api/v1/auth/token | "
+        "POST /api/v1/query | POST /api/v1/documents/upload",
     }
 
 
@@ -62,6 +64,8 @@ async def startup_event():
     logger.info(f"  Server        : http://localhost:{settings.PORT}")
     logger.info(f"  Docs (Swagger): http://localhost:{settings.PORT}/docs")
     logger.info(f"  Query API     : POST http://localhost:{settings.PORT}/api/v1/query")
+    logger.info(f"  Upload API    : POST http://localhost:{settings.PORT}/api/v1/documents/upload")
     logger.info(f"  Auth          : POST http://localhost:{settings.PORT}/api/v1/auth/token")
     logger.info(f"  Health check  : GET  http://localhost:{settings.PORT}/api/v1/health")
+    logger.info(f"  Allowed origins: {settings.allowed_origins}")
     logger.info("-" * 55)

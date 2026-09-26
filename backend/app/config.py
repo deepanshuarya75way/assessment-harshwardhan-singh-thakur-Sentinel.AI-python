@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     PORT: int = 8000
     ENVIRONMENT: str = "development"
     FRONTEND_URL: str = "http://localhost:5173"
+    # Comma-separated list of extra origins allowed to call this API — used
+    # to add the deployed Vercel URL(s) on top of the local dev origin above
+    # without needing a code change per environment.
+    EXTRA_ALLOWED_ORIGINS: str = ""
 
     # ── JWT Auth ────────────────────────────────────────────
     JWT_SECRET_KEY: str = "change-this-in-production"
@@ -42,6 +46,16 @@ class Settings(BaseSettings):
     PINECONE_INDEX_NAME: str = "sentinel-docs"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @property
+    def allowed_origins(self) -> list[str]:
+        """FRONTEND_URL plus any comma-separated EXTRA_ALLOWED_ORIGINS entries."""
+        origins = [self.FRONTEND_URL]
+        if self.EXTRA_ALLOWED_ORIGINS:
+            origins.extend(
+                o.strip() for o in self.EXTRA_ALLOWED_ORIGINS.split(",") if o.strip()
+            )
+        return origins
 
 
 settings = Settings()

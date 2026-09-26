@@ -1,85 +1,108 @@
-# Sentinel.AI — LangChain Edition (Backend Only)
+# Sentinel.AI — LangChain Edition
 
-A reimplementation of [Sentinel.AI](../Sentinel-AI) (the original Node.js/Express
-multi-agent RAG system) using **FastAPI + LangChain + Hugging Face**.
+A from-scratch reimplementation of [Sentinel.AI](https://github.com/HarshThakur47/Sentinel-AI)
+— a multi-agent RAG (Retrieval-Augmented Generation) system — rebuilt on
+**FastAPI + LangChain + Hugging Face**, paired with the original React frontend
+re-pointed at this new backend.
 
-Built to explore framework-based RAG orchestration vs. the original hand-rolled
-multi-agent architecture — same 4-step pipeline (retrieve → filter → generate →
-evaluate), same OpenRouter-backed LLM agents, reimplemented with LangChain's
-abstractions and a Hugging Face embedding model instead of Gemini.
+The original is a hand-rolled Node.js/Express implementation. This repo exists
+to demonstrate the same architecture built with a different, framework-based
+stack: same 4-step pipeline (retrieve → filter → generate → evaluate), same
+OpenRouter-backed LLM agents, same UI — reimplemented with LangChain's
+abstractions and a local Hugging Face embedding model instead of Gemini +
+Pinecone.
 
-## Architecture mapping (original → this service)
+**Live demo:** _add your Vercel URL here once deployed_
+**API docs:** _add your Hugging Face Space `/docs` URL here once deployed_
 
-| Original (Node) | This service (Python) | What changed |
+---
+
+## Repo structure
+
+```
+sentinel-ai-langchain/
+├── backend/     ← FastAPI + LangChain + Hugging Face RAG API
+└── frontend/    ← React + Vite UI (copy of the original, re-pointed at this backend)
+```
+
+Each folder is independently runnable and independently deployable — the
+backend to Hugging Face Spaces, the frontend to Vercel.
+
+---
+
+## Architecture
+
+**Pipeline:** a user query is embedded and searched against a Chroma vector
+store → a **Filter Agent** (Llama 3.3 70B) removes irrelevant/unsafe results →
+a **Generator Agent** (Claude 3 Haiku) writes a grounded answer, citing
+sources or falling back to general knowledge if nothing relevant was found →
+an **Evaluator Agent** (Gemini 2.0 Flash) independently fact-checks the
+answer against the sources and assigns a 0–10 confidence score, optionally
+rewriting the answer if it finds unsupported claims.
+
+**Frontend:** React 19 + Vite SPA. A chat view drives the pipeline above and
+renders the confidence score + cited sources per answer; an Ingestion view
+lets you drag-and-drop PDFs, which get chunked and embedded into the vector
+store live. Both views hit the backend through `src/lib/api.js`, which
+transparently handles JWT login and attaches the token to every request.
+
+### What changed vs. the original Node backend
+
+| Original (Node/Express) | This service (Python) | Why |
 |---|---|---|
-| `backend/server.js` + `app.js` | `app/main.py` | Express → FastAPI |
-| `backend/config/config.js` | `app/config.py` | Same env vars, pydantic-settings |
-| `backend/utils/llmClient.js` (hand-rolled axios) | `app/services/llm.py` | LangChain's `ChatOpenAI` pointed at OpenRouter's OpenAI-compatible endpoint — no custom HTTP client needed |
-| `backend/services/vectorDbService.js` (Gemini embeddings + Pinecone REST) | `app/services/embeddings.py` + `app/services/vectorstore.py` | Hugging Face `sentence-transformers` (local, free, no API key) + LangChain's `Chroma` wrapper (swappable for `PineconeVectorStore` in prod) |
-| `backend/agents/filterAgent.js` | `app/chains/filter_chain.py` | Manual prompt-building + `JSON.parse` → LangChain `ChatPromptTemplate` + LCEL chain (`prompt \| llm \| parser`) |
-| `backend/agents/generatorAgent.js` | `app/chains/generator_chain.py` | Same LCEL pattern |
-| `backend/agents/evaluatorAgent.js` | `app/chains/evaluator_chain.py` | Same LCEL pattern |
-| `backend/services/ragPipelineService.js` | `app/chains/rag_pipeline.py` | Same orchestration logic and graceful-degradation fallbacks, ported 1:1 |
-| `backend/controllers/queryController.js` (manual `validateQuery()`) | `app/schemas.py` (`QueryRequest`) | Manual validation → declarative Pydantic validation |
-| *(no auth existed)* | `app/security.py` + `app/routers/auth.py` | **New**: JWT-protected endpoints via `OAuth2PasswordBearer` |
-| *(SSE streaming controller)* | *(not yet ported)* | See "What's not included" below |
+| Hand-rolled Express routes/controllers | FastAPI routers | Auto-generated OpenAPI/Swagger docs at `/docs`, no hand-written docs |
+| Manual `if` validation in controllers | Pydantic models (`app/schemas.py`) | Declarative — FastAPI rejects malformed requests before your code runs |
+| Gemini embeddings + Pinecone (cloud, needs API keys) | Hugging Face `sentence-transformers` (local) + Chroma (local) | Runs with zero external API keys for retrieval — only the LLM calls need one |
+| No auth layer | JWT via `OAuth2PasswordBearer` (`app/security.py`) | Demonstrates a real protected-endpoint pattern |
+| Hand-rolled axios HTTP client for OpenRouter | LangChain's `ChatOpenAI` pointed at OpenRouter's OpenAI-compatible endpoint | No custom HTTP client needed |
+| Manual prompt strings + `JSON.parse` per agent | LangChain `ChatPromptTemplate` + LCEL chains (`prompt \| llm \| parser`) per agent | Declarative chain composition |
 
-## What's genuinely different (not just relabeled)
+Same 3 agents, same models, same orchestration logic and graceful-degradation
+fallbacks — ported 1:1, just expressed through a different framework's
+idioms.
 
-1. **Embeddings**: swapped Gemini's hosted embedding API for a local, open-source
-   Hugging Face model (`all-MiniLM-L6-v2`) — no API key needed to run retrieval.
-2. **Vector store**: Chroma for local dev (zero setup) instead of requiring a live
-   Pinecone index; swappable to `PineconeVectorStore` by changing one function.
-3. **Validation**: Pydantic models replace hand-written `if` checks — FastAPI
-   auto-rejects malformed requests before your code even runs.
-4. **Auth**: added a JWT layer that didn't exist in the original — demonstrates
-   `OAuth2PasswordBearer` + protected routes.
-5. **Docs**: FastAPI auto-generates interactive Swagger docs at `/docs` — nothing
-   to write by hand.
+---
 
-## Setup
+## Running locally
+
+### Backend
 
 ```bash
-# 1. Create virtual environment
-python3 -m venv venv       # py -m venv venv 
-source venv/bin/activate   # Windows: venv\Scripts\activate
-
-# 2. Install dependencies
+cd backend
+python -m venv venv
+venv\Scripts\Activate.ps1        # macOS/Linux: source venv/bin/activate
 pip install -r requirements.txt
-
-# 3. Configure environment
-cp .env.example .env
-# Edit .env and add your OPENROUTER_API_KEY (get one free at openrouter.ai)
-# Chroma + Hugging Face need NO API key — they run locally
-
-# 4. Run the server
+cp .env.example .env             # then fill in OPENROUTER_API_KEY
 uvicorn app.main:app --reload --port 8000
 ```
+Visit `http://localhost:8000/docs` for interactive Swagger UI.
 
-Visit **http://localhost:8000/docs** for interactive Swagger UI.
-
-## Try it
+### Frontend
 
 ```bash
-# 1. Get a JWT (demo credentials in .env.example: admin / changeme123)
-curl -X POST http://localhost:8000/api/v1/auth/token \
-  -H "Content-Type: application/json" \
-  -d '{"username": "admin", "password": "changeme123"}'
-
-# Response: { "access_token": "eyJ...", "token_type": "bearer" }
-
-# 2. Ask a question (replace <TOKEN> with the access_token above)
-curl -X POST http://localhost:8000/api/v1/query \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <TOKEN>" \
-  -d '{"userQuery": "How does RAG reduce hallucinations?"}'
+cd frontend
+npm install
+npm run dev
 ```
+Visit `http://localhost:5173`. Demo login (`admin` / `changeme123` by
+default) happens silently on first request — no login screen needed.
 
-The first request will be slow (~10-20s) while the Hugging Face embedding
-model downloads and loads into memory. Subsequent requests are fast.
+---
+
+## Deployment
+
+- **Backend → Hugging Face Spaces** (Docker SDK). Needed because the backend
+  loads a PyTorch-based embedding model locally — HF Spaces' free tier gives
+  16GB RAM, well past what Render's free tier (512MB) can handle. See
+  `backend/README_HF_SPACE.md` for the Space's required secrets.
+- **Frontend → Vercel**, with root directory set to `frontend/`.
+
+---
 
 ## Tech stack
 
-FastAPI · LangChain (LCEL) · Hugging Face `sentence-transformers` · Chroma ·
-OpenRouter (Claude 3 Haiku, Llama 3.3 70B, Gemini 2.0 Flash — same models as
-the original) · Pydantic · JWT (`python-jose`)
+**Backend:** FastAPI · LangChain (LCEL) · Hugging Face `sentence-transformers`
+· Chroma · OpenRouter (Claude 3 Haiku, Llama 3.3 70B, Gemini 2.0 Flash) ·
+Pydantic · JWT (`python-jose`)
+
+**Frontend:** React 19 · Vite 8 · Lucide Icons · vanilla CSS
