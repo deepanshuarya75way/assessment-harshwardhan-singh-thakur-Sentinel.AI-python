@@ -21,3 +21,6 @@ chroma_db/
 .idea/
 .DS_Store
 *.log
+
+fastembed_cache/
+backend/fastembed_cache/
