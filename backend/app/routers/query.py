@@ -42,5 +42,7 @@ async def handle_query(payload: QueryRequest, current_user: str = Depends(get_cu
     Body:  { "userQuery": "..." }
     Auth:  Bearer <JWT>   (obtain via POST /api/v1/auth/token)
     """
-    result = await run_rag_pipeline(payload.user_query)
+
+    history = [m.model_dump() for m in payload.history]
+    result = await run_rag_pipeline(payload.user_query, history)
     return result

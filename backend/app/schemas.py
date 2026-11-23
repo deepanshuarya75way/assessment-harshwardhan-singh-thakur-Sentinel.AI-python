@@ -4,12 +4,17 @@ This is the direct replacement for the manual `validateQuery()` checks
 in the Node queryController.js.
 """
 
-from typing import List, Optional
+
+from typing import List, Literal, Optional
 from pydantic import BaseModel, Field, field_validator
 
+class HistoryMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(..., max_length=4000)
 
 class QueryRequest(BaseModel):
     user_query: str = Field(..., alias="userQuery", min_length=1, max_length=1000)
+    history: List[HistoryMessage] = Field(default_factory=list, max_length=20)
 
     @field_validator("user_query")
     @classmethod

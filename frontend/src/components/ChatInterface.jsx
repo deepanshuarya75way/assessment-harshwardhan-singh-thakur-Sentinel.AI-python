@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, CheckCircle, Search, Filter, Sparkles, ShieldCheck } from 'lucide-react';
+import { Send, Bot, User, CheckCircle, Search, Filter, Sparkles, ShieldCheck, Plus } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import SourceBadge from './SourceBadge';
 import { apiFetch } from '../lib/api';
@@ -10,6 +10,21 @@ const PIPELINE_STEPS = [
   { key: 'generating', label: 'Generating Answer',    icon: Sparkles },
   { key: 'evaluating', label: 'Evaluating Response',  icon: ShieldCheck },
 ];
+const MAX_HISTORY_MESSAGES = 6;
+const MAX_HISTORY_CHARS = 3000;
+
+const buildHistory = (msgs) => {
+  const history = [];
+  for (let i = 0; i< msgs.length - 1; i++) {
+     if (msgs[i].role === 'user' && msgs[i+1].role === 'bot' && msgs[i+1].status === 'success') {
+      history.push({role: 'user', content: msgs[i].content.slice(0, MAX_HISTORY_CHARS)})
+      history.push({role: 'assistant', content: msgs[i+1].content.slice(0, MAX_HISTORY_CHARS)})
+     }
+  }
+
+  return history.slice(-MAX_HISTORY_MESSAGES);
+}
+
 
 const ChatInterface = () => {
   const [messages, setMessages] = useState([]);
@@ -27,11 +42,11 @@ const ChatInterface = () => {
     scrollToBottom();
   }, [messages, isLoading, pipelineStep]);
 
-  const queryWithSSE = (userQuery) => {
+  const queryWithSSE = (userQuery, history) => {
     return new Promise((resolve, reject) => {
       apiFetch('/query/stream', {
         method: 'POST',
-        body: JSON.stringify({ userQuery }),
+        body: JSON.stringify({ userQuery , history}),
       })
         .then((response) => {
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -87,10 +102,10 @@ const ChatInterface = () => {
   };
 
 
-  const queryWithFetch = async (userQuery) => {
+  const queryWithFetch = async (userQuery, history) => {
     const response = await apiFetch('/query', {
       method: 'POST',
-      body: JSON.stringify({ userQuery }),
+      body: JSON.stringify({ userQuery , history}),
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.json();
@@ -101,6 +116,7 @@ const ChatInterface = () => {
     if (!input.trim()) return;
 
     const userQuery = input.trim();
+    const history = buildHistory(messages);
     const userMessage = { role: 'user', content: userQuery };
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
@@ -112,10 +128,10 @@ const ChatInterface = () => {
 
       let data;
       try {
-        data = await queryWithSSE(userQuery);
+        data = await queryWithSSE(userQuery, history);
       } catch {
         setPipelineStep(null);
-        data = await queryWithFetch(userQuery);
+        data = await queryWithFetch(userQuery, history);
       }
 
       const botMessage = {
@@ -139,11 +155,25 @@ const ChatInterface = () => {
     }
   };
 
-
+  const handleNewChat = () => {
+    setMessages([]);
+    setInput('');
+  }
   const activeStepIndex = PIPELINE_STEPS.findIndex((s) => s.key === pipelineStep);
 
   return (
     <div className="chat-interface">
+      {messages.length > 0 && (
+        <button
+          type="button"
+          className="back-button"
+          onClick={handleNewChat}
+          disabled={isLoading}
+          style={{alignSelf: 'flex-end', alignItems: 'center', display: 'inline-flex'}}
+        >
+          <bold>New Chat</bold>
+        </button>
+      )}
       <div className="chat-history">
         {messages.length === 0 && !isLoading && (
           <div className="empty-state animate-fade-in-scale">

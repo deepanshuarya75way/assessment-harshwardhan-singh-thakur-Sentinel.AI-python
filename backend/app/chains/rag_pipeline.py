@@ -18,13 +18,22 @@ from app.services.vectorstore import get_retriever
 logger = logging.getLogger("sentinel.rag_pipeline")
 
 
-async def run_rag_pipeline(user_query: str) -> dict:
+async def run_rag_pipeline(user_query: str, history: list[dict] | None = None) -> dict:
     start = time.time()
 
+    history = (history or [])[-6:]
+
+    search_query = user_query
+    for m in reversed(history):
+        if m["role"] == "user":
+            search_query = f'{m["content"]} {user_query}'
+            break
+    
+    logger.info(f"[Pipeline] Search query: {search_query}")
     # ── Step 1: Retrieval ────────────────────────────────────
     try:
         retriever = get_retriever(top_k=15)
-        raw_documents = await retriever.ainvoke(user_query)
+        raw_documents = await retriever.ainvoke(search_query)
     except Exception as err:  # noqa: BLE001
         logger.warning(f"[Pipeline] Retrieval failed — falling back to general knowledge. {err}")
         raw_documents = []
@@ -35,7 +44,7 @@ async def run_rag_pipeline(user_query: str) -> dict:
     filtered_documents, filter_summary, removed_count = [], "No documents retrieved — using general knowledge.", 0
     if has_documents:
         try:
-            filter_result = await run_filter_chain(user_query, raw_documents)
+            filter_result = await run_filter_chain(search_query, raw_documents)
             filtered_documents = filter_result["filteredDocuments"]
             filter_summary = filter_result["filterSummary"]
             removed_count = filter_result["removedCount"]
@@ -49,13 +58,13 @@ async def run_rag_pipeline(user_query: str) -> dict:
 
     # ── Step 3: Generator Chain ──────────────────────────────
     try:
-        generated_answer = await run_generator_chain(user_query, filtered_documents)
+        generated_answer = await run_generator_chain(search_query, filtered_documents, history)
     except Exception as err:  # noqa: BLE001
         raise RuntimeError(f"Generator chain failed: {err}") from err
 
     # ── Step 4: Evaluator Chain ──────────────────────────────
     try:
-        eval_result = await run_evaluator_chain(user_query, generated_answer, filtered_documents)
+        eval_result = await run_evaluator_chain(search_query, generated_answer, filtered_documents)
     except Exception as err:  # noqa: BLE001
         logger.warning(f"[Pipeline] Evaluator failed — using default score. {err}")
         eval_result = {
